@@ -1,0 +1,43 @@
+name: Compare Upstream
+
+on:
+  schedule:
+  - cron: "15 2 * * *" # 2:15am UTC every day
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_change: ${{ steps.compare_step.outputs.upstream_change }}
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.11"
+    - name: Upgrade pip and install requests
+      run: python -m pip install --upgrade build requests
+    - name: Get naif_leapseconds from PyPI and Extract latest_leapseconds.tls
+      # Download the contents of the PyPI package to the `remote` folder
+      # Extract the file we want to md5 compare and store it in `remote/latest_leapseconds.tls`
+      run: |
+        pip download --no-binary :all: -d remote naif_leapseconds
+        tar -zxf remote/* --wildcards --no-anchored '*latest_leapseconds.tls' -O > remote/latest_leapseconds.tls
+    - name: Download the NAIF leapseconds file
+      # Fetch the new files we care about and stick them in `new`
+      run: |
+        mkdir new
+        python naif_leapseconds/fetch.py --file new/latest_leapseconds.tls --md5_file new/latest_leapseconds.md5
+    - name: Detect Changes to latest_leapseconds.tls
+      # Compare the md5s of the two files and indicate upstream change in the output
+      id: compare_step
+      run: |
+        python naif_leapseconds/compare.py remote/latest_leapseconds.tls new/latest_leapseconds.tls && echo 'upstream_change=false' >> $GITHUB_OUTPUT || echo 'upstream_change=true' >> $GITHUB_OUTPUT
+
+  build-test-publish:
+    needs: compare
+    if: needs.compare.outputs.upstream_change == 'true'
+    uses: B612-Asteroid-Institute/naif_leapseconds/.github/workflows/build_test_publish.yml@main
