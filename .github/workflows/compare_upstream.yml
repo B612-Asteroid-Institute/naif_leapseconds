@@ -24,7 +24,7 @@ jobs:
       # Download the contents of the PyPI package to the `remote` folder
       # Extract the file we want to md5 compare and store it in `remote/latest_leapseconds.tls`
       run: |
-        pip download --no-binary :all: -d remote naif_leapseconds
+        pip download --no-binary :all: -d remote naif-leapseconds
         tar -zxf remote/* --wildcards --no-anchored '*latest_leapseconds.tls' -O > remote/latest_leapseconds.tls
     - name: Download the NAIF leapseconds file
       # Fetch the new files we care about and stick them in `new`
